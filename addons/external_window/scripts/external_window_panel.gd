@@ -1,0 +1,154 @@
+@tool
+extends Control
+
+var plugin: EditorPlugin
+var wm: RefCounted
+var check_timer: Timer
+var embedded_hwnd: int = 0
+
+var toolbar: HBoxContainer
+var window_dropdown: OptionButton
+var container_panel: Panel
+
+
+func _ready() -> void:
+	# Instantiate WindowManager from GDExtension
+	wm = ClassDB.instantiate("WindowManager")
+
+	# Build UI
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(vbox)
+
+	# Toolbar
+	toolbar = HBoxContainer.new()
+	vbox.add_child(toolbar)
+
+	var label = Label.new()
+	label.text = "选择窗口："
+	toolbar.add_child(label)
+
+	window_dropdown = OptionButton.new()
+	window_dropdown.custom_minimum_size = Vector2i(300, 0)
+	window_dropdown.item_selected.connect(_on_window_selected)
+	toolbar.add_child(window_dropdown)
+
+	var refresh_btn = Button.new()
+	refresh_btn.text = "刷新"
+	refresh_btn.pressed.connect(_refresh_window_list)
+	toolbar.add_child(refresh_btn)
+
+	var unembed_btn = Button.new()
+	unembed_btn.text = "取消嵌入"
+	unembed_btn.pressed.connect(_do_unembed)
+	toolbar.add_child(unembed_btn)
+
+	# Container panel for embedded window
+	container_panel = Panel.new()
+	container_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(container_panel)
+
+	# Check timer for embedded window validity
+	check_timer = Timer.new()
+	check_timer.wait_time = 0.5
+	check_timer.one_shot = false
+	check_timer.timeout.connect(_check_embedded_window)
+	add_child(check_timer)
+
+	_refresh_window_list()
+
+
+func _get_editor_hwnd() -> int:
+	# DisplayServer.WINDOW_HANDLE = 1
+	return DisplayServer.window_get_native_handle(1)
+
+
+func _get_container_screen_rect() -> Rect2i:
+	var window_pos = DisplayServer.window_get_position()
+	var scale = get_content_scale_factor()
+	var panel_rect = container_panel.get_global_rect()
+	return Rect2i(
+		window_pos.x + int(panel_rect.position.x * scale),
+		window_pos.y + int(panel_rect.position.y * scale),
+		int(panel_rect.size.x * scale),
+		int(panel_rect.size.y * scale)
+	)
+
+
+func _refresh_window_list() -> void:
+	window_dropdown.clear()
+	window_dropdown.add_item("-- 选择窗口 --", 0)
+
+	var editor_hwnd = _get_editor_hwnd()
+	var windows = wm.get_visible_windows()
+
+	for i in range(windows.size()):
+		var entry: Dictionary = windows[i]
+		var hwnd_val: int = int(entry["hwnd"])
+		var title: String = str(entry["title"])
+
+		# Skip the Godot editor window itself
+		if hwnd_val == editor_hwnd:
+			continue
+
+		window_dropdown.add_item(title, hwnd_val)
+
+	window_dropdown.disabled = window_dropdown.item_count <= 1
+
+
+func _on_window_selected(index: int) -> void:
+	var hwnd_val = window_dropdown.get_item_id(index)
+	if hwnd_val == 0:
+		return
+
+	# Unembed current window if any
+	_do_unembed()
+
+	var editor_hwnd = _get_editor_hwnd()
+	var rect = _get_container_screen_rect()
+
+	if wm.embed_window(hwnd_val, editor_hwnd, rect):
+		embedded_hwnd = hwnd_val
+		var title = wm.get_window_title(hwnd_val)
+		if title.is_empty():
+			title = "未命名窗口"
+		if plugin:
+			plugin.set_window_title(title)
+		check_timer.start()
+	else:
+		embedded_hwnd = 0
+		window_dropdown.select(0)
+
+
+func _do_unembed() -> void:
+	if embedded_hwnd != 0:
+		wm.unembed_window()
+		embedded_hwnd = 0
+		if plugin:
+			plugin.set_window_title("外部窗口")
+	check_timer.stop()
+
+
+func _check_embedded_window() -> void:
+	if embedded_hwnd != 0 and not wm.is_window_valid(embedded_hwnd):
+		_do_unembed()
+		_refresh_window_list()
+
+
+func on_tab_activated() -> void:
+	if embedded_hwnd != 0 and wm.has_embedded_window():
+		var rect = _get_container_screen_rect()
+		wm.reposition_embedded(rect)
+		wm.show_embedded()
+
+
+func on_tab_deactivated() -> void:
+	if wm.has_embedded_window():
+		wm.hide_embedded()
+
+
+func cleanup() -> void:
+	_do_unembed()
+	if check_timer:
+		check_timer.stop()

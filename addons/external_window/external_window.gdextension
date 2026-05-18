@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "gdextension_initialize"
+compatibility_minimum = "4.2"
+reloadable = true
+
+[libraries]
+
+windows.debug.x86_64 = "res://addons/external_window/bin/libexternal_window.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/external_window/bin/libexternal_window.windows.template_release.x86_64.dll"

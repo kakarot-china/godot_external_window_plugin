@@ -1,0 +1,11 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly.
+
+[application]
+
+config/name="External Window Plugin"
+config/features=PackedStringArray("4.6")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/external_window/plugin.cfg")

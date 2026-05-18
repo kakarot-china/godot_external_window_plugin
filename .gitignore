@@ -1,0 +1,29 @@
+# Godot
+*.import
+.godot/
+export_presets.cfg
+
+# Build artifacts
+*.o
+*.os
+*.so
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.sln
+*.vcxproj*
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

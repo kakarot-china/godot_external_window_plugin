@@ -1,0 +1,39 @@
+name: Build GDExtension
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install SCons
+        run: pip install scons
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Debug
+        run: scons target=template_debug
+
+      - name: Build Release
+        run: scons target=template_release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-window-plugin
+          path: addons/external_window/
+          if-no-files-found: error
