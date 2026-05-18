@@ -66,7 +66,7 @@ func _get_editor_hwnd() -> int:
 
 func _get_container_screen_rect() -> Rect2i:
 	var window_pos = DisplayServer.window_get_position()
-	var scale = get_content_scale_factor()
+	var scale = EditorInterface.get_editor_scale()
 	var panel_rect = container_panel.get_global_rect()
 	return Rect2i(
 		window_pos.x + int(panel_rect.position.x * scale),
