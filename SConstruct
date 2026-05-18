@@ -8,9 +8,19 @@ env.Append(LIBS=["user32", "kernel32"])
 
 sources = Glob("src/*.cpp")
 
-library = env.SharedLibrary(
-    "addons/external_window/bin/libexternal_window" + env["suffix"],
-    source=sources,
-)
+if env["platform"] == "macos":
+    library = env.SharedLibrary(
+        "addons/external_window/bin/libexternal_window.{}.{}.{}".format(
+            env["platform"], env["target"], env["arch"]
+        ),
+        source=sources,
+    )
+else:
+    library = env.SharedLibrary(
+        "addons/external_window/bin/libexternal_window{}{}".format(
+            env["suffix"], env["SHLIBSUFFIX"]
+        ),
+        source=sources,
+    )
 
 Default(library)
