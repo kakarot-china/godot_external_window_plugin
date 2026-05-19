@@ -66,8 +66,17 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 	HWND child_hwnd = reinterpret_cast<HWND>(p_child_hwnd);
 	HWND owner_hwnd = reinterpret_cast<HWND>(p_owner_hwnd);
 
+	UtilityFunctions::print(vformat("[EW] embed_window: child=0x%X owner=0x%X rect=(%d,%d %dx%d)",
+			(unsigned int)(uintptr_t)child_hwnd, (unsigned int)(uintptr_t)owner_hwnd,
+			p_screen_rect.position.x, p_screen_rect.position.y,
+			p_screen_rect.size.x, p_screen_rect.size.y));
+
 	if (!IsWindow(child_hwnd)) {
-		UtilityFunctions::push_warning("WindowManager: Invalid window handle");
+		UtilityFunctions::push_warning("[EW] child hwnd is NOT a valid window");
+		return false;
+	}
+	if (!IsWindow(owner_hwnd)) {
+		UtilityFunctions::push_warning("[EW] owner hwnd is NOT a valid window");
 		return false;
 	}
 
@@ -81,6 +90,10 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 	original_owner = (HWND)GetWindowLongPtrW(child_hwnd, GWLP_HWNDPARENT);
 	original_placement.length = sizeof(WINDOWPLACEMENT);
 	GetWindowPlacement(child_hwnd, &original_placement);
+
+	UtilityFunctions::print(vformat("[EW] saved: style=0x%X ex_style=0x%X owner=0x%X showCmd=%d",
+			(unsigned int)original_style, (unsigned int)original_ex_style,
+			(unsigned int)(uintptr_t)original_owner, original_placement.showCmd));
 
 	// Restyle: frameless popup
 	LONG_PTR new_style = WS_POPUP | WS_CLIPCHILDREN | WS_VISIBLE;
@@ -102,6 +115,17 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 
 	ShowWindow(child_hwnd, SW_SHOWNOACTIVATE);
 
+	// Verify final state
+	LONG_PTR verify_style = GetWindowLongPtrW(child_hwnd, GWL_STYLE);
+	HWND verify_owner = (HWND)GetWindowLongPtrW(child_hwnd, GWLP_HWNDPARENT);
+	BOOL visible = IsWindowVisible(child_hwnd);
+	RECT final_rect;
+	GetWindowRect(child_hwnd, &final_rect);
+	UtilityFunctions::print(vformat("[EW] after embed: style=0x%X owner=0x%X visible=%d rect=(%d,%d %dx%d)",
+			(unsigned int)verify_style, (unsigned int)(uintptr_t)verify_owner, visible,
+			final_rect.left, final_rect.top,
+			final_rect.right - final_rect.left, final_rect.bottom - final_rect.top));
+
 	embedded_hwnd = child_hwnd;
 	is_embedded = true;
 
@@ -112,6 +136,8 @@ void WindowManager::unembed_window() {
 	if (!is_embedded || !embedded_hwnd) {
 		return;
 	}
+
+	UtilityFunctions::print(vformat("[EW] unembed: hwnd=0x%X", (unsigned int)(uintptr_t)embedded_hwnd));
 
 	if (IsWindow(embedded_hwnd)) {
 		ShowWindow(embedded_hwnd, SW_HIDE);
@@ -130,6 +156,16 @@ void WindowManager::unembed_window() {
 
 		// Restore original placement (position, size, maximized state)
 		SetWindowPlacement(embedded_hwnd, &original_placement);
+
+		// Verify
+		LONG_PTR v_style = GetWindowLongPtrW(embedded_hwnd, GWL_STYLE);
+		HWND v_owner = (HWND)GetWindowLongPtrW(embedded_hwnd, GWLP_HWNDPARENT);
+		RECT v_rect;
+		GetWindowRect(embedded_hwnd, &v_rect);
+		UtilityFunctions::print(vformat("[EW] after unembed: style=0x%X owner=0x%X rect=(%d,%d %dx%d)",
+				(unsigned int)v_style, (unsigned int)(uintptr_t)v_owner,
+				v_rect.left, v_rect.top,
+				v_rect.right - v_rect.left, v_rect.bottom - v_rect.top));
 
 		ShowWindow(embedded_hwnd, SW_SHOW);
 		SetForegroundWindow(embedded_hwnd);
