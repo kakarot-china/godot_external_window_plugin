@@ -10,6 +10,8 @@ WindowManager::WindowManager()
 	  original_parent_hwnd(nullptr),
 	  original_style(0),
 	  original_ex_style(0),
+	  original_rect({0, 0, 0, 0}),
+	  original_maximized(false),
 	  is_embedded(false) {
 }
 
@@ -80,6 +82,8 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_parent_hwnd, co
 	original_parent_hwnd = GetParent(child_hwnd);
 	original_style = GetWindowLongPtrW(child_hwnd, GWL_STYLE);
 	original_ex_style = GetWindowLongPtrW(child_hwnd, GWL_EXSTYLE);
+	GetWindowRect(child_hwnd, &original_rect);
+	original_maximized = IsZoomed(child_hwnd) != 0;
 
 	// Remove frame styles, add child style
 	LONG_PTR new_style = original_style;
@@ -143,12 +147,17 @@ void WindowManager::unembed_window() {
 			SetParent(embedded_hwnd, nullptr);
 		}
 
-		// Restore as a top-level window
-		SetWindowPos(embedded_hwnd, HWND_TOP, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-
-		// Show restored window
-		ShowWindow(embedded_hwnd, SW_SHOW);
+		// Restore original position and size
+		if (original_maximized) {
+			ShowWindow(embedded_hwnd, SW_SHOWMAXIMIZED);
+		} else {
+			MoveWindow(embedded_hwnd,
+					original_rect.left, original_rect.top,
+					original_rect.right - original_rect.left,
+					original_rect.bottom - original_rect.top,
+					TRUE);
+			ShowWindow(embedded_hwnd, SW_SHOW);
+		}
 
 		// Bring back to foreground
 		SetForegroundWindow(embedded_hwnd);
@@ -158,6 +167,8 @@ void WindowManager::unembed_window() {
 	original_parent_hwnd = nullptr;
 	original_style = 0;
 	original_ex_style = 0;
+	original_rect = {0, 0, 0, 0};
+	original_maximized = false;
 	is_embedded = false;
 }
 

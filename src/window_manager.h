@@ -19,6 +19,8 @@ private:
 	HWND original_parent_hwnd;
 	LONG_PTR original_style;
 	LONG_PTR original_ex_style;
+	RECT original_rect;
+	bool original_maximized;
 	bool is_embedded;
 
 	static BOOL CALLBACK enum_windows_proc(HWND hWnd, LPARAM lParam);

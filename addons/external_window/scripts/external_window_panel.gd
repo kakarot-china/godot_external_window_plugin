@@ -65,12 +65,11 @@ func _get_editor_hwnd() -> int:
 
 
 func _get_container_screen_rect() -> Rect2i:
-	var window_pos = DisplayServer.window_get_position()
 	var scale = EditorInterface.get_editor_scale()
 	var panel_rect = container_panel.get_global_rect()
 	return Rect2i(
-		window_pos.x + int(panel_rect.position.x * scale),
-		window_pos.y + int(panel_rect.position.y * scale),
+		int(panel_rect.position.x * scale),
+		int(panel_rect.position.y * scale),
 		int(panel_rect.size.x * scale),
 		int(panel_rect.size.y * scale)
 	)
@@ -94,6 +93,15 @@ func _refresh_window_list() -> void:
 			continue
 
 		window_dropdown.add_item(title, hwnd_val)
+
+	# Re-add embedded window if it's still valid (it won't appear in EnumWindows
+	# because SetParent made it a child window)
+	if embedded_hwnd != 0 and wm.is_window_valid(embedded_hwnd):
+		var embedded_title = wm.get_window_title(embedded_hwnd)
+		if embedded_title.is_empty():
+			embedded_title = "未命名窗口"
+		window_dropdown.add_item(embedded_title + " (已嵌入)", embedded_hwnd)
+		window_dropdown.select(window_dropdown.item_count - 1)
 
 	window_dropdown.disabled = window_dropdown.item_count <= 1
 
