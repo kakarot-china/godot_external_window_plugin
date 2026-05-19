@@ -16,17 +16,13 @@ class WindowManager : public RefCounted {
 
 private:
 	HWND embedded_hwnd;
-	HWND container_hwnd;
-	HWND original_parent_hwnd;
+	HWND original_owner;
 	LONG_PTR original_style;
 	LONG_PTR original_ex_style;
-	RECT original_rect;
-	bool original_maximized;
+	WINDOWPLACEMENT original_placement;
 	bool is_embedded;
 
-	static bool window_class_registered;
 	static BOOL CALLBACK enum_windows_proc(HWND hWnd, LPARAM lParam);
-	bool register_container_class();
 
 public:
 	WindowManager();

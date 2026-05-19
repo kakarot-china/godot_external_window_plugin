@@ -5,16 +5,12 @@
 
 namespace godot {
 
-bool WindowManager::window_class_registered = false;
-
 WindowManager::WindowManager()
 	: embedded_hwnd(nullptr),
-	  container_hwnd(nullptr),
-	  original_parent_hwnd(nullptr),
+	  original_owner(nullptr),
 	  original_style(0),
 	  original_ex_style(0),
-	  original_rect({0, 0, 0, 0}),
-	  original_maximized(false),
+	  original_placement({sizeof(WINDOWPLACEMENT)}),
 	  is_embedded(false) {
 }
 
@@ -22,22 +18,6 @@ WindowManager::~WindowManager() {
 	if (is_embedded) {
 		unembed_window();
 	}
-}
-
-bool WindowManager::register_container_class() {
-	if (window_class_registered) {
-		return true;
-	}
-	WNDCLASSEXW wc = {};
-	wc.cbSize = sizeof(WNDCLASSEXW);
-	wc.lpfnWndProc = DefWindowProcW;
-	wc.hInstance = GetModuleHandle(nullptr);
-	wc.lpszClassName = L"ExternalWindowContainer";
-	if (!RegisterClassExW(&wc)) {
-		return false;
-	}
-	window_class_registered = true;
-	return true;
 }
 
 BOOL CALLBACK WindowManager::enum_windows_proc(HWND hWnd, LPARAM lParam) {
@@ -87,7 +67,7 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 	HWND owner_hwnd = reinterpret_cast<HWND>(p_owner_hwnd);
 
 	if (!IsWindow(child_hwnd)) {
-		UtilityFunctions::push_warning("WindowManager: Invalid child window handle");
+		UtilityFunctions::push_warning("WindowManager: Invalid window handle");
 		return false;
 	}
 
@@ -96,51 +76,31 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 	}
 
 	// Save original state
-	original_parent_hwnd = GetParent(child_hwnd);
 	original_style = GetWindowLongPtrW(child_hwnd, GWL_STYLE);
 	original_ex_style = GetWindowLongPtrW(child_hwnd, GWL_EXSTYLE);
-	GetWindowRect(child_hwnd, &original_rect);
-	original_maximized = IsZoomed(child_hwnd) != 0;
+	original_owner = (HWND)GetWindowLongPtrW(child_hwnd, GWLP_HWNDPARENT);
+	original_placement.length = sizeof(WINDOWPLACEMENT);
+	GetWindowPlacement(child_hwnd, &original_placement);
 
-	// Create a popup container window positioned at the screen rect
-	if (!register_container_class()) {
-		UtilityFunctions::push_warning("WindowManager: Failed to register container window class");
-		return false;
-	}
-
-	container_hwnd = CreateWindowExW(
-			WS_EX_NOACTIVATE,
-			L"ExternalWindowContainer", L"",
-			WS_POPUP | WS_CLIPCHILDREN,
-			p_screen_rect.position.x, p_screen_rect.position.y,
-			p_screen_rect.size.x, p_screen_rect.size.y,
-			owner_hwnd, nullptr, GetModuleHandle(nullptr), nullptr);
-
-	if (!container_hwnd) {
-		UtilityFunctions::push_warning("WindowManager: Failed to create container window");
-		return false;
-	}
-
-	// Remove frame styles from target, add child style
-	LONG_PTR new_style = original_style;
-	new_style &= ~(WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-	new_style |= WS_CHILD;
+	// Restyle: frameless popup
+	LONG_PTR new_style = WS_POPUP | WS_CLIPCHILDREN | WS_VISIBLE;
 	SetWindowLongPtrW(child_hwnd, GWL_STYLE, new_style);
 
 	LONG_PTR new_ex_style = original_ex_style;
 	new_ex_style &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME);
 	SetWindowLongPtrW(child_hwnd, GWL_EXSTYLE, new_ex_style);
 
-	SetWindowPos(child_hwnd, nullptr, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	// Set owner to editor window so popup stays above it
+	SetWindowLongPtrW(child_hwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(owner_hwnd));
 
-	// Reparent target into our container
-	SetParent(child_hwnd, container_hwnd);
-	MoveWindow(child_hwnd, 0, 0, p_screen_rect.size.x, p_screen_rect.size.y, TRUE);
+	// Position at screen rect and apply style changes
+	MoveWindow(child_hwnd, p_screen_rect.position.x, p_screen_rect.position.y,
+			p_screen_rect.size.x, p_screen_rect.size.y, TRUE);
 
-	// Show both
-	ShowWindow(child_hwnd, SW_SHOW);
-	ShowWindow(container_hwnd, SW_SHOWNOACTIVATE);
+	SetWindowPos(child_hwnd, HWND_TOP, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
+	ShowWindow(child_hwnd, SW_SHOWNOACTIVATE);
 
 	embedded_hwnd = child_hwnd;
 	is_embedded = true;
@@ -155,74 +115,55 @@ void WindowManager::unembed_window() {
 
 	if (IsWindow(embedded_hwnd)) {
 		ShowWindow(embedded_hwnd, SW_HIDE);
-		SetParent(embedded_hwnd, nullptr);
+
+		// Restore original owner first
+		SetWindowLongPtrW(embedded_hwnd, GWLP_HWNDPARENT,
+				reinterpret_cast<LONG_PTR>(original_owner));
 
 		// Restore original styles
 		SetWindowLongPtrW(embedded_hwnd, GWL_STYLE, original_style);
 		SetWindowLongPtrW(embedded_hwnd, GWL_EXSTYLE, original_ex_style);
-		SetWindowPos(embedded_hwnd, nullptr, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
-		// Restore original parent
-		if (original_parent_hwnd && IsWindow(original_parent_hwnd)) {
-			SetParent(embedded_hwnd, original_parent_hwnd);
-		}
+		SetWindowPos(embedded_hwnd, HWND_TOP, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
-		// Restore original position and size
-		if (original_maximized) {
-			ShowWindow(embedded_hwnd, SW_SHOWMAXIMIZED);
-		} else {
-			MoveWindow(embedded_hwnd,
-					original_rect.left, original_rect.top,
-					original_rect.right - original_rect.left,
-					original_rect.bottom - original_rect.top,
-					TRUE);
-			ShowWindow(embedded_hwnd, SW_SHOW);
-		}
+		// Restore original placement (position, size, maximized state)
+		SetWindowPlacement(embedded_hwnd, &original_placement);
 
+		ShowWindow(embedded_hwnd, SW_SHOW);
 		SetForegroundWindow(embedded_hwnd);
 	}
 
-	// Destroy our container
-	if (container_hwnd && IsWindow(container_hwnd)) {
-		DestroyWindow(container_hwnd);
-	}
-
-	container_hwnd = nullptr;
 	embedded_hwnd = nullptr;
-	original_parent_hwnd = nullptr;
+	original_owner = nullptr;
 	original_style = 0;
 	original_ex_style = 0;
-	original_rect = {0, 0, 0, 0};
-	original_maximized = false;
+	original_placement = {sizeof(WINDOWPLACEMENT)};
 	is_embedded = false;
 }
 
 void WindowManager::reposition_embedded(const Rect2i &p_screen_rect) {
-	if (!is_embedded || !container_hwnd || !IsWindow(container_hwnd)) {
+	if (!is_embedded || !embedded_hwnd || !IsWindow(embedded_hwnd)) {
 		return;
 	}
-	// Move container to new screen position
-	MoveWindow(container_hwnd, p_screen_rect.position.x, p_screen_rect.position.y,
+	MoveWindow(embedded_hwnd, p_screen_rect.position.x, p_screen_rect.position.y,
 			p_screen_rect.size.x, p_screen_rect.size.y, TRUE);
-	// Resize embedded window to fill container
-	if (embedded_hwnd && IsWindow(embedded_hwnd)) {
-		MoveWindow(embedded_hwnd, 0, 0, p_screen_rect.size.x, p_screen_rect.size.y, TRUE);
-	}
 }
 
 void WindowManager::show_embedded() {
-	if (!is_embedded || !container_hwnd || !IsWindow(container_hwnd)) {
+	if (!is_embedded || !embedded_hwnd || !IsWindow(embedded_hwnd)) {
 		return;
 	}
-	ShowWindow(container_hwnd, SW_SHOWNOACTIVATE);
+	SetWindowPos(embedded_hwnd, HWND_TOP, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	ShowWindow(embedded_hwnd, SW_SHOWNOACTIVATE);
 }
 
 void WindowManager::hide_embedded() {
-	if (!is_embedded || !container_hwnd || !IsWindow(container_hwnd)) {
+	if (!is_embedded || !embedded_hwnd || !IsWindow(embedded_hwnd)) {
 		return;
 	}
-	ShowWindow(container_hwnd, SW_HIDE);
+	ShowWindow(embedded_hwnd, SW_HIDE);
 }
 
 bool WindowManager::is_window_valid(int64_t p_hwnd) const {
