@@ -47,6 +47,7 @@ func _ready() -> void:
 	container_panel = Panel.new()
 	container_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	container_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container_panel.resized.connect(_on_container_resized)
 	vbox.add_child(container_panel)
 
 	# Check timer for embedded window validity
@@ -60,8 +61,7 @@ func _ready() -> void:
 
 
 func _get_editor_hwnd() -> int:
-	# DisplayServer.WINDOW_HANDLE = 1
-	return DisplayServer.window_get_native_handle(1)
+	return DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
 
 
 func _get_container_screen_rect() -> Rect2i:
@@ -80,16 +80,17 @@ func _refresh_window_list() -> void:
 	window_dropdown.clear()
 	window_dropdown.add_item("-- 选择窗口 --", 0)
 
-	var editor_hwnd = _get_editor_hwnd()
+	var editor_pid = OS.get_process_id()
 	var windows = wm.get_visible_windows()
 
 	for i in range(windows.size()):
 		var entry: Dictionary = windows[i]
 		var hwnd_val: int = int(entry["hwnd"])
 		var title: String = str(entry["title"])
+		var pid: int = int(entry["pid"])
 
-		# Skip the Godot editor window itself
-		if hwnd_val == editor_hwnd:
+		# Skip all windows belonging to the Godot editor process
+		if pid == editor_pid:
 			continue
 
 		window_dropdown.add_item(title, hwnd_val)
@@ -134,6 +135,12 @@ func _check_embedded_window() -> void:
 	if embedded_hwnd != 0 and not wm.is_window_valid(embedded_hwnd):
 		_do_unembed()
 		_refresh_window_list()
+
+
+func _on_container_resized() -> void:
+	if embedded_hwnd != 0 and wm.has_embedded_window():
+		var rect = _get_container_screen_rect()
+		wm.reposition_embedded(rect)
 
 
 func on_tab_activated() -> void:

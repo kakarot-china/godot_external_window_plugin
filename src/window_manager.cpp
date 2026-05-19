@@ -106,6 +106,10 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_parent_hwnd, co
 	// Show the embedded window
 	ShowWindow(child_hwnd, SW_SHOW);
 
+	// Bring embedded window to foreground within parent
+	SetWindowPos(child_hwnd, HWND_TOP, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
 	embedded_hwnd = child_hwnd;
 	is_embedded = true;
 
@@ -139,8 +143,15 @@ void WindowManager::unembed_window() {
 			SetParent(embedded_hwnd, nullptr);
 		}
 
+		// Restore as a top-level window
+		SetWindowPos(embedded_hwnd, HWND_TOP, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
 		// Show restored window
 		ShowWindow(embedded_hwnd, SW_SHOW);
+
+		// Bring back to foreground
+		SetForegroundWindow(embedded_hwnd);
 	}
 
 	embedded_hwnd = nullptr;
