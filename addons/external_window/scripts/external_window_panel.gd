@@ -5,6 +5,7 @@ var plugin: EditorPlugin
 var wm: RefCounted
 var check_timer: Timer
 var embedded_hwnd: int = 0
+var _last_rect: Rect2i
 
 var toolbar: HBoxContainer
 var window_dropdown: OptionButton
@@ -50,7 +51,7 @@ func _ready() -> void:
 	container_panel.resized.connect(_on_container_resized)
 	vbox.add_child(container_panel)
 
-	# Check timer for embedded window validity
+	# Check timer for embedded window validity and position sync
 	check_timer = Timer.new()
 	check_timer.wait_time = 0.5
 	check_timer.one_shot = false
@@ -65,11 +66,12 @@ func _get_editor_hwnd() -> int:
 
 
 func _get_container_screen_rect() -> Rect2i:
+	var window_pos = DisplayServer.window_get_position()
 	var scale = EditorInterface.get_editor_scale()
 	var panel_rect = container_panel.get_global_rect()
 	return Rect2i(
-		int(panel_rect.position.x * scale),
-		int(panel_rect.position.y * scale),
+		window_pos.x + int(panel_rect.position.x * scale),
+		window_pos.y + int(panel_rect.position.y * scale),
 		int(panel_rect.size.x * scale),
 		int(panel_rect.size.y * scale)
 	)
@@ -119,6 +121,7 @@ func _on_window_selected(index: int) -> void:
 
 	if wm.embed_window(hwnd_val, editor_hwnd, rect):
 		embedded_hwnd = hwnd_val
+		_last_rect = rect
 		var title = wm.get_window_title(hwnd_val)
 		if title.is_empty():
 			title = "未命名窗口"
@@ -134,27 +137,37 @@ func _do_unembed() -> void:
 	if embedded_hwnd != 0:
 		wm.unembed_window()
 		embedded_hwnd = 0
+		_last_rect = Rect2i()
 		if plugin:
 			plugin.set_window_title("外部窗口")
 	check_timer.stop()
 
 
 func _check_embedded_window() -> void:
-	if embedded_hwnd != 0 and not wm.is_window_valid(embedded_hwnd):
-		_do_unembed()
-		_refresh_window_list()
+	if embedded_hwnd != 0:
+		if not wm.is_window_valid(embedded_hwnd):
+			_do_unembed()
+			_refresh_window_list()
+			return
+		# Sync position when editor window moves
+		var rect = _get_container_screen_rect()
+		if rect != _last_rect:
+			wm.reposition_embedded(rect)
+			_last_rect = rect
 
 
 func _on_container_resized() -> void:
 	if embedded_hwnd != 0 and wm.has_embedded_window():
 		var rect = _get_container_screen_rect()
 		wm.reposition_embedded(rect)
+		_last_rect = rect
 
 
 func on_tab_activated() -> void:
 	if embedded_hwnd != 0 and wm.has_embedded_window():
 		var rect = _get_container_screen_rect()
 		wm.reposition_embedded(rect)
+		_last_rect = rect
 		wm.show_embedded()
 
 
