@@ -13,6 +13,9 @@ var container_panel: Panel
 
 
 func _ready() -> void:
+	# Fill the editor main screen area
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
 	# Instantiate WindowManager from GDExtension
 	wm = ClassDB.instantiate("WindowManager")
 
