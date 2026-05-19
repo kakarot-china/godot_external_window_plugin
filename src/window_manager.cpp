@@ -116,16 +116,17 @@ void WindowManager::unembed_window() {
 	if (IsWindow(embedded_hwnd)) {
 		ShowWindow(embedded_hwnd, SW_HIDE);
 
-		// Restore original owner first
-		SetWindowLongPtrW(embedded_hwnd, GWLP_HWNDPARENT,
-				reinterpret_cast<LONG_PTR>(original_owner));
-
-		// Restore original styles
+		// Restore original styles FIRST
 		SetWindowLongPtrW(embedded_hwnd, GWL_STYLE, original_style);
 		SetWindowLongPtrW(embedded_hwnd, GWL_EXSTYLE, original_ex_style);
 
-		SetWindowPos(embedded_hwnd, HWND_TOP, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+		// Then restore owner
+		SetWindowLongPtrW(embedded_hwnd, GWLP_HWNDPARENT,
+				reinterpret_cast<LONG_PTR>(original_owner));
+
+		// Apply style changes
+		SetWindowPos(embedded_hwnd, nullptr, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
 		// Restore original placement (position, size, maximized state)
 		SetWindowPlacement(embedded_hwnd, &original_placement);
@@ -184,6 +185,16 @@ bool WindowManager::has_embedded_window() const {
 	return is_embedded;
 }
 
+Vector2i WindowManager::get_client_position(int64_t p_hwnd) const {
+	HWND hwnd = reinterpret_cast<HWND>(p_hwnd);
+	if (!IsWindow(hwnd)) {
+		return Vector2i();
+	}
+	POINT pt = { 0, 0 };
+	ClientToScreen(hwnd, &pt);
+	return Vector2i(pt.x, pt.y);
+}
+
 void WindowManager::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_visible_windows"), &WindowManager::get_visible_windows);
 	ClassDB::bind_method(D_METHOD("embed_window", "child_hwnd", "owner_hwnd", "screen_rect"), &WindowManager::embed_window);
@@ -193,6 +204,7 @@ void WindowManager::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("hide_embedded"), &WindowManager::hide_embedded);
 	ClassDB::bind_method(D_METHOD("is_window_valid", "hwnd"), &WindowManager::is_window_valid);
 	ClassDB::bind_method(D_METHOD("get_window_title", "hwnd"), &WindowManager::get_window_title);
+	ClassDB::bind_method(D_METHOD("get_client_position", "hwnd"), &WindowManager::get_client_position);
 	ClassDB::bind_method(D_METHOD("has_embedded_window"), &WindowManager::has_embedded_window);
 }
 

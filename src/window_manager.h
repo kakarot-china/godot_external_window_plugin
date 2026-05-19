@@ -5,6 +5,7 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/rect2i.hpp>
 
 #include <windows.h>
@@ -36,6 +37,7 @@ public:
 	void hide_embedded();
 	bool is_window_valid(int64_t p_hwnd) const;
 	String get_window_title(int64_t p_hwnd) const;
+	Vector2i get_client_position(int64_t p_hwnd) const;
 	bool has_embedded_window() const;
 
 protected:
