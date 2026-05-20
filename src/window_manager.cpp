@@ -154,8 +154,11 @@ void WindowManager::unembed_window() {
 		SetWindowPos(embedded_hwnd, nullptr, 0, 0, 0, 0,
 				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
-		// Restore original placement (position, size, maximized state)
-		SetWindowPlacement(embedded_hwnd, &original_placement);
+		// Restore original placement but show in normal (restored) state.
+		// Force SW_SHOWNORMAL so minimized/maximized windows come back visible.
+		WINDOWPLACEMENT restore_placement = original_placement;
+		restore_placement.showCmd = SW_SHOWNORMAL;
+		SetWindowPlacement(embedded_hwnd, &restore_placement);
 
 		// Verify
 		LONG_PTR v_style = GetWindowLongPtrW(embedded_hwnd, GWL_STYLE);
@@ -167,7 +170,6 @@ void WindowManager::unembed_window() {
 				v_rect.left, v_rect.top,
 				v_rect.right - v_rect.left, v_rect.bottom - v_rect.top));
 
-		ShowWindow(embedded_hwnd, SW_SHOW);
 		SetForegroundWindow(embedded_hwnd);
 	}
 

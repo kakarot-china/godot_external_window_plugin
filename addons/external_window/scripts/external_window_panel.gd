@@ -13,7 +13,9 @@ var container_panel: Panel
 
 
 func _ready() -> void:
-	# Fill the editor main screen area
+	# Editor main screen is a VBoxContainer — it uses size_flags, not anchors, to allocate space
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Instantiate WindowManager from GDExtension
