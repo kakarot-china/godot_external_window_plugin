@@ -67,9 +67,7 @@ func _ready() -> void:
 
 
 func _get_editor_hwnd() -> int:
-	var hwnd = DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
-	print("[EW] editor hwnd: ", hwnd, " (0x", ("%X" % hwnd), ")")
-	return hwnd
+	return DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
 
 
 func _get_container_screen_rect() -> Rect2i:
@@ -77,14 +75,12 @@ func _get_container_screen_rect() -> Rect2i:
 	var panel_rect = container_panel.get_global_rect()
 	var editor_hwnd = _get_editor_hwnd()
 	var client_pos = wm.get_client_position(editor_hwnd)
-	var rect = Rect2i(
+	return Rect2i(
 		client_pos.x + int(panel_rect.position.x * scale),
 		client_pos.y + int(panel_rect.position.y * scale),
 		int(panel_rect.size.x * scale),
 		int(panel_rect.size.y * scale)
 	)
-	print("[EW] screen_rect: client_pos=", client_pos, " panel_rect=", panel_rect, " scale=", scale, " result=", rect)
-	return rect
 
 
 func _refresh_window_list() -> void:
