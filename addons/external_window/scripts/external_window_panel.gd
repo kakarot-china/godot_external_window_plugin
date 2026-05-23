@@ -77,11 +77,13 @@ func _get_container_screen_rect() -> Rect2i:
 	var panel_rect = container_panel.get_global_rect()
 	var editor_hwnd = _get_editor_hwnd()
 	var client_pos = wm.get_client_position(editor_hwnd)
+	# get_global_rect() returns physical pixel coordinates within the editor viewport.
+	# ClientToScreen also returns physical pixels. No scale conversion needed.
 	var result = Rect2i(
-		client_pos.x + int(panel_rect.position.x * scale),
-		client_pos.y + int(panel_rect.position.y * scale),
-		int(panel_rect.size.x * scale),
-		int(panel_rect.size.y * scale)
+		client_pos.x + int(panel_rect.position.x),
+		client_pos.y + int(panel_rect.position.y),
+		int(panel_rect.size.x),
+		int(panel_rect.size.y)
 	)
 	print("[EW] screen_rect: scale=", scale,
 		" panel_rect=(", panel_rect.position.x, ",", panel_rect.position.y, " ", panel_rect.size.x, "x", panel_rect.size.y, ")",

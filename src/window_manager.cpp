@@ -115,6 +115,10 @@ bool WindowManager::embed_window(int64_t p_child_hwnd, int64_t p_owner_hwnd, con
 	// Set owner to editor window so popup stays above it
 	SetWindowLongPtrW(child_hwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(owner_hwnd));
 
+	// Force window visible — handles minimized windows (showCmd=SW_SHOWMINIMIZED).
+	// MoveWindow fails silently on minimized windows, so we must restore first.
+	ShowWindow(child_hwnd, SW_SHOWNA);
+
 	// Position at screen rect and apply style changes
 	MoveWindow(child_hwnd, p_screen_rect.position.x, p_screen_rect.position.y,
 			p_screen_rect.size.x, p_screen_rect.size.y, TRUE);
@@ -193,11 +197,21 @@ void WindowManager::unembed_window() {
 		LONG_PTR after_style = GetWindowLongPtrW(embedded_hwnd, GWL_STYLE);
 		HWND after_owner = (HWND)GetWindowLongPtrW(embedded_hwnd, GWLP_HWNDPARENT);
 		BOOL after_visible = IsWindowVisible(embedded_hwnd);
-		UtilityFunctions::print(vformat("[EW] unembed RESULT: style=0x%X owner=0x%X visible=%d rect=(%d,%d %dx%d)",
-				(unsigned int)after_style, (unsigned int)(uintptr_t)after_owner, after_visible,
+		BOOL after_iconic = IsIconic(embedded_hwnd);
+		HWND after_foreground = GetForegroundWindow();
+		UtilityFunctions::print(vformat("[EW] unembed RESULT: style=0x%X owner=0x%X visible=%d iconic=%d rect=(%d,%d %dx%d) foreground=0x%X this=0x%X",
+				(unsigned int)after_style, (unsigned int)(uintptr_t)after_owner,
+				after_visible, after_iconic,
 				after_rect.left, after_rect.top,
-				after_rect.right - after_rect.left, after_rect.bottom - after_rect.top));
+				after_rect.right - after_rect.left, after_rect.bottom - after_rect.top,
+				(unsigned int)(uintptr_t)after_foreground, (unsigned int)(uintptr_t)embedded_hwnd));
 
+		// Use TOPMOST to guarantee the window is visible above the editor,
+		// then remove topmost so it behaves as a normal window.
+		SetWindowPos(embedded_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		SetWindowPos(embedded_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		SetForegroundWindow(embedded_hwnd);
 	}
 
