@@ -67,7 +67,9 @@ func _ready() -> void:
 
 
 func _get_editor_hwnd() -> int:
-	return DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+	var hwnd = DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+	print("[EW] editor_hwnd: ", hwnd, " (0x", ("%X" % hwnd), ")")
+	return hwnd
 
 
 func _get_container_screen_rect() -> Rect2i:
@@ -75,12 +77,17 @@ func _get_container_screen_rect() -> Rect2i:
 	var panel_rect = container_panel.get_global_rect()
 	var editor_hwnd = _get_editor_hwnd()
 	var client_pos = wm.get_client_position(editor_hwnd)
-	return Rect2i(
+	var result = Rect2i(
 		client_pos.x + int(panel_rect.position.x * scale),
 		client_pos.y + int(panel_rect.position.y * scale),
 		int(panel_rect.size.x * scale),
 		int(panel_rect.size.y * scale)
 	)
+	print("[EW] screen_rect: scale=", scale,
+		" panel_rect=(", panel_rect.position.x, ",", panel_rect.position.y, " ", panel_rect.size.x, "x", panel_rect.size.y, ")",
+		" client_pos=(", client_pos.x, ",", client_pos.y, ")",
+		" result=(", result.position.x, ",", result.position.y, " ", result.size.x, "x", result.size.y, ")")
+	return result
 
 
 func _refresh_window_list() -> void:
@@ -119,6 +126,8 @@ func _on_window_selected(index: int) -> void:
 	if hwnd_val == 0:
 		return
 
+	print("[EW] ===== SELECT WINDOW: hwnd=0x", ("%X" % hwnd_val), " title=", window_dropdown.get_item_text(index))
+
 	# Unembed current window if any
 	_do_unembed()
 
@@ -141,6 +150,7 @@ func _on_window_selected(index: int) -> void:
 
 func _do_unembed() -> void:
 	if embedded_hwnd != 0:
+		print("[EW] ===== UNEMBED: hwnd=0x", ("%X" % embedded_hwnd))
 		wm.unembed_window()
 		embedded_hwnd = 0
 		_last_rect = Rect2i()
